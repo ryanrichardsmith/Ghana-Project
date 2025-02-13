@@ -10,7 +10,7 @@ library(labelled)
 library(tableone)
 library(ggplot2)
 
-endline <- read_dta("~/Downloads/endline_cleaned.dta")
+endline <- read_dta("endline_cleaned.dta")
 
 #creating numeric chilid
 endline$num_childid <- seq_len(nrow(endline))
@@ -27,14 +27,17 @@ endline <- endline %>%
 endline <- endline %>%
   mutate(day2_missing = ifelse(is.na(day2), "Missing", "Not Missing"))
 
+#creating age categories
 endline <- endline %>%
-  mutate(across(c(district, wlthind, ethnicity, mstatus, educ, religion, sex, alive), as_factor))
+  mutate(womanage_group = case_when(
+    womanage >= 15 & womanage <= 24 ~ "15-24",
+    womanage >= 25 & womanage <= 34 ~ "25-34",
+    womanage >= 35 & womanage <= 49 ~ "35-49"))
 
-household_vars <- c("district", "wlthind")
-maternal_vars <- c("womanage", "ethnicity", "mstatus", "mumedu", "religion")
-child_vars <- c("sex","alive")
+endline <- endline %>%
+  mutate(across(c(district, wlthind, ethnicity, mstatus, mumedu, religion, sex, alive), as_factor))
 
-table <- CreateTableOne(vars = c("district","wlthind","womanage","ethnicity",
+table <- CreateTableOne(vars = c("wlthind","womanage_group","ethnicity",
                                  "mstatus","mumedu","religion","sex","alive"),
                         strata = "day2_missing",  
                         data = endline, 
@@ -44,7 +47,17 @@ print(table)
 
 endline %>%
   filter(!is.na(district)) %>%
-ggplot(aes(x = district, fill = factor(day2_missing))) +
-  geom_bar(position = "dodge") +
-  labs(x = "District", y = "Number of Children", fill = "Day2 Missing") +
+  group_by(district) %>%
+  mutate(total = n()) %>%  
+  ungroup() %>%
+  count(district, day2_missing, total) %>%  
+  mutate(percentage = n / total * 100) %>%
+  group_by(district) %>%
+  mutate(ordering_value = percentage[day2_missing == "Missing"]) %>%
+  ungroup() %>%
+  arrange(ordering_value) %>%  
+  mutate(district = factor(district, levels = unique(district))) %>%  
+  ggplot(aes(y = district, x = percentage, fill = factor(day2_missing))) +
+  geom_col(position = "dodge") +  # Ensure two bars per district
+  labs(y = "District", x = "Percentage of Children", fill = "Day2 Missing") +
   theme_minimal()

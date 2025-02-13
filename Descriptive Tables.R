@@ -41,7 +41,7 @@ table <- CreateTableOne(vars = c("wlthind","womanage_group","ethnicity",
                                  "mstatus","mumedu","religion","sex","alive"),
                         strata = "day2_missing",  
                         data = endline, 
-                        test = TRUE)  # Perform statistical tests
+                        test = TRUE)  
 
 print(table)
 
@@ -58,6 +58,6 @@ endline %>%
   arrange(ordering_value) %>%  
   mutate(district = factor(district, levels = unique(district))) %>%  
   ggplot(aes(y = district, x = percentage, fill = factor(day2_missing))) +
-  geom_col(position = "dodge") +  # Ensure two bars per district
+  geom_col(position = "dodge") +
   labs(y = "District", x = "Percentage of Children", fill = "Day2 Missing") +
   theme_minimal()

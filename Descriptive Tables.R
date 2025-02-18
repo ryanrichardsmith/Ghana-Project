@@ -34,6 +34,18 @@ endline <- endline %>%
     womanage >= 25 & womanage <= 34 ~ "25-34",
     womanage >= 35 & womanage <= 49 ~ "35-49"))
 
+#creating variable labels for easier interpretation
+var_labels <- c(
+  wlthind = "Wealth Index",
+  womanage_group = "Age Group",
+  ethnicity = "Ethnicity",
+  mstatus = "Marital Status",
+  mumedu = "Mother's Education",
+  religion = "Religion",
+  sex = "Sex",
+  alive = "Alive Status"
+)
+
 endline <- endline %>%
   mutate(across(c(district, wlthind, ethnicity, mstatus, mumedu, religion, sex, alive), as_factor))
 
@@ -43,7 +55,7 @@ table <- CreateTableOne(vars = c("wlthind","womanage_group","ethnicity",
                         data = endline, 
                         test = TRUE)  
 
-print(table)
+print(table, varLabels = TRUE)
 
 endline %>%
   filter(!is.na(district)) %>%

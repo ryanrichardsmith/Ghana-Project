@@ -32,22 +32,25 @@ endline <- endline %>%
   mutate(womanage_group = case_when(
     womanage >= 15 & womanage <= 24 ~ "15-24",
     womanage >= 25 & womanage <= 34 ~ "25-34",
-    womanage >= 35 & womanage <= 49 ~ "35-49"))
+    womanage >= 35 & womanage <= 44 ~ "35-44",
+    womanage >= 45 ~ "45+"
+    ))
 
 #creating variable labels for easier interpretation
-var_labels <- c(
-  wlthind = "Wealth Index",
-  womanage_group = "Age Group",
-  ethnicity = "Ethnicity",
+var_label(endline) <- list(
+  wlthind = "Mother's Wealth Index",
+  womanage_group = "Mother's Age Group",
+  ethnicity = "Mother's Ethnicity",
   mstatus = "Marital Status",
   mumedu = "Mother's Education",
-  religion = "Religion",
-  sex = "Sex",
-  alive = "Alive Status"
+  religion = "Mother's Religion",
+  sex = "Child's Sex",
+  alive = "Child's Alive Status"
 )
 
 endline <- endline %>%
   mutate(across(c(district, wlthind, ethnicity, mstatus, mumedu, religion, sex, alive), as_factor))
+
 
 table <- CreateTableOne(vars = c("wlthind","womanage_group","ethnicity",
                                  "mstatus","mumedu","religion","sex","alive"),

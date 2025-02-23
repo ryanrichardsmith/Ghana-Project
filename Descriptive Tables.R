@@ -80,7 +80,6 @@ endline %>%
   labs(y = "District", x = "Percentage of Children", fill = "Day2 Missing") +
   theme_minimal()
 
-
 table2 <- CreateTableOne(vars = c("wlthind","womanage_group","ethnicity",
                                  "mstatus","mumedu","religion","sex","alive"),
                         strata = "day2_discordant",  

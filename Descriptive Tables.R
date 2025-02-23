@@ -27,6 +27,11 @@ endline <- endline %>%
 endline <- endline %>%
   mutate(day2_missing = ifelse(is.na(day2), "Missing", "Not Missing"))
 
+
+endline <- endline %>%
+  mutate(day2_discordant = ifelse(is.na(day1) | is.na(day2), NA, 
+                                  ifelse(day1 == day2, "Cordant Day2", "Discordant Day 2")))
+
 #creating age categories
 endline <- endline %>%
   mutate(womanage_group = case_when(
@@ -41,7 +46,7 @@ var_label(endline) <- list(
   wlthind = "Mother's Wealth Index",
   womanage_group = "Mother's Age Group",
   ethnicity = "Mother's Ethnicity",
-  mstatus = "Marital Status",
+  mstatus = "Mother's Marital Status",
   mumedu = "Mother's Education",
   religion = "Mother's Religion",
   sex = "Child's Sex",
@@ -60,19 +65,26 @@ table <- CreateTableOne(vars = c("wlthind","womanage_group","ethnicity",
 
 print(table, varLabels = TRUE)
 
+#plotting percentage of children with day2 missing broken down by district
+#code by prof. Helleringer
 endline %>%
   filter(!is.na(district)) %>%
-  group_by(district) %>%
+  group_by(day2_missing) %>%
   mutate(total = n()) %>%  
   ungroup() %>%
-  count(district, day2_missing, total) %>%  
+  count(day2_missing,district,total) %>%  
   mutate(percentage = n / total * 100) %>%
-  group_by(district) %>%
-  mutate(ordering_value = percentage[day2_missing == "Missing"]) %>%
-  ungroup() %>%
-  arrange(ordering_value) %>%  
   mutate(district = factor(district, levels = unique(district))) %>%  
   ggplot(aes(y = district, x = percentage, fill = factor(day2_missing))) +
   geom_col(position = "dodge") +
   labs(y = "District", x = "Percentage of Children", fill = "Day2 Missing") +
   theme_minimal()
+
+
+table2 <- CreateTableOne(vars = c("wlthind","womanage_group","ethnicity",
+                                 "mstatus","mumedu","religion","sex","alive"),
+                        strata = "day2_discordant",  
+                        data = endline, 
+                        test = TRUE)  
+
+print(table, varLabels = TRUE)

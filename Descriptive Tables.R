@@ -1,14 +1,7 @@
-install.packages("haven")
-install.packages("dplyr")
-install.packages("labelled")
-install.packages("tableone")
-install.packages("ggplot2")
+install.packages("pacman")
+library(pacman)
 
-library(haven)
-library(dplyr)
-library(labelled)
-library(tableone)
-library(ggplot2)
+p_load("haven","dplyr","labelled","tableone","ggplot2","Gmisc")
 
 endline <- read_dta("endline_cleaned.dta")
 
@@ -27,10 +20,11 @@ endline <- endline %>%
 endline <- endline %>%
   mutate(day2_missing = ifelse(is.na(day2), "Missing", "Not Missing"))
 
-
+#creating a dichotomous variable based on agreement between day1 and day2
 endline <- endline %>%
   mutate(day2_discordant = ifelse(is.na(day1) | is.na(day2), NA, 
-                                  ifelse(day1 == day2, "Cordant Day2", "Discordant Day 2")))
+                                  ifelse(day1 == day2, "Cordant Day2", "Discordant Day 2"))) %>%
+  mutate(day2_discordant = factor(day2_discordant, levels = c("Cordant Day2", "Discordant Day 2")))
 
 #creating age categories
 endline <- endline %>%
@@ -80,10 +74,13 @@ endline %>%
   labs(y = "District", x = "Percentage of Children", fill = "Day2 Missing") +
   theme_minimal()
 
-table2 <- CreateTableOne(vars = c("wlthind","womanage_group","ethnicity",
-                                 "mstatus","mumedu","religion","sex","alive"),
-                        strata = "day2_discordant",  
-                        data = endline, 
-                        test = TRUE)  
 
-print(table, varLabels = TRUE)
+table2 <- endline %>% 
+  getDescriptionStatsBy(wlthind, womanage_group,ethnicity, mstatus, mumedu, 
+                        religion, sex, alive,
+                        by = day2_discordant,
+                        hrzl_prop = TRUE,
+                        statistics = TRUE)
+
+
+print(table2)

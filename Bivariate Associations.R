@@ -58,19 +58,13 @@ endline <- endline %>%
 
 #regressing the likelihood of birth day discordance on child's vital status 
 #converting day2_discordant to be numeric (1 or 2) then subtracting one to make it 1 or 0
-model1 <- lm(as.numeric(day2_discordant) - 1 ~ alive + religion + mumedu + mstatus + 
-               ethnicity + womanage_group + wlthind, data = endline)
-table3 <- tbl_regression(model1, exponentiate = FALSE)
-print(table3)
-
-#logistic regression for the same
-model1b <- glm(as.numeric(day2_discordant) - 1 ~ alive + religion + mumedu + mstatus +
+model1 <- glm(as.numeric(day2_discordant) - 1 ~ alive + religion + mumedu + mstatus +
                     ethnicity + womanage_group + wlthind, data = endline, 
                   family = binomial)
 
                                  #exponentiate presents coefficients as odds ratios
-table3b <- tbl_regression(model1b, exponentiate = TRUE) 
-print(table3b)
+table3 <- tbl_regression(model1, exponentiate = TRUE) 
+print(table3)
 
 #plotting day2 discordance vs age at death (months)
 endline %>%
@@ -87,17 +81,11 @@ endline %>%
 
 #regressing the likelihood of day2_discordance on birth & insurance registration 
 #converting day2_discordant to be numeric (1 or 2) then subtracting one to make it 1 or 0
-model2 <- lm(as.numeric(day2_discordant) - 1 ~ as_factor(immcard, levels = "default") 
-             + as_factor(nhis, levels = "default"), 
-             data = subset(endline, alive == "Yes"))
-table4 <- tbl_regression(model2, exponentiate = FALSE)
-print(table4)
-
-#logistic regression for the same
-model2b <- glm(as.numeric(day2_discordant) - 1 ~ as_factor(immcard, levels = "default") 
-               + as_factor(nhis, levels = "default"),
+model2 <- glm(as.numeric(day2_discordant) - 1 ~ as_factor(immcard, levels = "default") 
+               + as_factor(nhis, levels = "default") + as_factor(registered) + 
+               religion + mumedu + mstatus + ethnicity + womanage_group + wlthind,                                                   
                data = subset(endline, alive == "Yes"), family = binomial)
 
                                    #exponentiate presents coefficients as odds ratios
-table4b <- tbl_regression(model2b, exponentiate = TRUE) 
-print(table4b)
+table4 <- tbl_regression(model2, exponentiate = TRUE) 
+print(table4)

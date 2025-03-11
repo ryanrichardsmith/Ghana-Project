@@ -89,3 +89,39 @@ model2 <- glm(as.numeric(day2_discordant) - 1 ~ as_factor(immcard, levels = "def
                                    #exponentiate presents coefficients as odds ratios
 table4 <- tbl_regression(model2, exponentiate = TRUE) 
 print(table4)
+
+#plotting all3dpt against day2_discordant
+endline %>%
+  filter(!is.na(age_mon), !is.na(day2_discordant)) %>%
+  mutate(age_weeks = age_mon * 4) %>%  
+  group_by(age_weeks, day2_discordant) %>%  
+  summarise(percent_all3dpt = mean(all3dpt == 1) * 100, .groups = 'drop') %>%
+  ggplot(aes(x = factor(age_weeks), y = percent_all3dpt, fill = factor(day2_discordant))) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7) + 
+  labs(
+    x = "Age (Weeks)",
+    y = "Percentage Immunized on all 3 DPT (all3dpt = 1)",
+    fill = "Day 2 Discordant"  
+  ) +
+  theme_minimal() +  
+  theme(
+    legend.position = "top") +
+  scale_fill_manual(values = c("blue", "red"))  
+
+#plotting vitAsup against day2_discordant
+endline %>%
+  filter(!is.na(age_mon), !is.na(day2_discordant)) %>%
+  mutate(age_weeks = age_mon * 4) %>%  
+  group_by(age_weeks, day2_discordant) %>%  
+  summarise(percent_vitAsup = mean(vitAsup == 1) * 100, .groups = 'drop') %>%
+  ggplot(aes(x = factor(age_weeks), y = percent_vitAsup, fill = factor(day2_discordant))) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7) + 
+  labs(
+    x = "Age (Weeks)",
+    y = "Percentage with 2 doses of Vit A Supplementation  (vitAsup = 1)",
+    fill = "Day 2 Discordant"  
+  ) +
+  theme_minimal() +  
+  theme(
+    legend.position = "top") +
+  scale_fill_manual(values = c("blue", "red"))  

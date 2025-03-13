@@ -1,34 +1,10 @@
 install.packages("pacman")
 library(pacman)
 
-p_load("haven","dplyr","labelled","tableone","ggplot2","Gmisc","gtsummary","lubridate")
+p_load("haven","dplyr","labelled","tableone","ggplot2","Gmisc","gtsummary",
+       "lubridate", "tidyr")
 
-endline <- read_dta("endline_cleaned.dta")
-
-#creating numeric chilid
-endline$num_childid <- seq_len(nrow(endline))
-
-#creating numeric womanid
-endline <- endline %>%
-  mutate(num_womanid = as.numeric(factor(womanid)))
-
-#creating numeric hhid
-endline <- endline %>%
-  mutate(num_hhid = as.numeric(factor(hhid)))
-
-#creating a dichotomous variable based on day2
-endline <- endline %>%
-  mutate(day2_missing = ifelse(is.na(day2), "Missing", "Not Missing"))
-
-#creating a dichotomous variable based on agreement between day1 and day2
-endline <- endline %>%
-  mutate(day2_discordant = ifelse(is.na(day1) | is.na(day2), NA, 
-                                  ifelse(day1 == day2, 0, 1))) %>%
-  mutate(day2_discordant = factor(day2_discordant, 
-                                  levels = c(0, 1), 
-                                  labels = c("Cordant", "Discordant")))
-
-var_label(endline$day2_discordant) <- "Day2 Discordance"
+endline <- readRDS("endline.rds")
 
 #generating DOBs based on hypothetical misestimations of +/- 1 year  
 endline <- endline %>%
@@ -71,3 +47,29 @@ var_label(endline) <- list(
   day2_overestimate_discordant = "Day2 Discordance (Overestimated Year of Birth)",
   day2_underestimate_discordant = "Day2 Discordance (Overestimated Year of Birth)"
 )
+
+#plotting hypothetical day2 concordances
+ endline %>%
+       filter(day2_discordant == "Discordant Day 2") %>%
+       group_by(sex) %>%
+       summarise(
+             Cordant_Day2_Overestimate = mean(day2_overestimate_discordant == "Cordant Day2", na.rm = TRUE),
+             Cordant_Day2_Underestimate = mean(day2_underestimate_discordant == "Cordant Day2", na.rm = TRUE),
+             Discordant_Day2_Either = mean(
+                   day2_overestimate_discordant == "Discordant Day 2" | 
+                         day2_underestimate_discordant == "Discordant Day 2", 
+                   na.rm = TRUE
+               )
+         ) %>%
+       mutate(across(-sex, ~ . / (Cordant_Day2_Overestimate + Cordant_Day2_Underestimate 
+                                  + Discordant_Day2_Either) * 100)) %>%
+       pivot_longer(cols = -sex, names_to = "Scenarios", values_to = "Percentage") %>%
+       ggplot(aes(x = sex, y = Percentage, fill = Scenarios)) +
+       geom_bar(stat = "identity", position = "stack") +
+       labs(
+             title = "Hypothetical Day 2 Concordance by Sex",
+             x = "Sex",
+             y = "Percentage",
+             fill = "Category"
+         ) +
+       theme_minimal()

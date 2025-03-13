@@ -1,60 +1,10 @@
 install.packages("pacman")
 library(pacman)
 
-p_load("haven","dplyr","labelled","tableone","ggplot2","Gmisc","gtsummary")
+p_load("haven","dplyr","labelled","tableone","ggplot2","Gmisc","gtsummary",
+       "lubridate", "tidyr")
 
-endline <- read_dta("endline_cleaned.dta")
-
-#creating numeric chilid
-endline$num_childid <- seq_len(nrow(endline))
-
-#creating numeric womanid
-endline <- endline %>%
-  mutate(num_womanid = as.numeric(factor(womanid)))
-
-#creating numeric hhid
-endline <- endline %>%
-  mutate(num_hhid = as.numeric(factor(hhid)))
-
-#creating a dichotomous variable based on day2
-endline <- endline %>%
-  mutate(day2_missing = ifelse(is.na(day2), "Missing", "Not Missing"))
-
-#creating a dichotomous variable based on agreement between day1 and day2
-endline <- endline %>%
-  mutate(day2_discordant = ifelse(is.na(day1) | is.na(day2), NA, 
-                                  ifelse(day1 == day2, 0, 1))) %>%
-  mutate(day2_discordant = factor(day2_discordant, 
-                                  levels = c(0, 1), 
-                                  labels = c("Cordant", "Discordant")))
-
-var_label(endline$day2_discordant) <- "Day2 Discordance"
-
-#creating age categories
-endline <- endline %>%
-  mutate(womanage_group = case_when(
-    womanage >= 15 & womanage <= 24 ~ "15-24",
-    womanage >= 25 & womanage <= 34 ~ "25-34",
-    womanage >= 35 & womanage <= 44 ~ "35-44",
-    womanage >= 45 ~ "45+"
-  ))
-
-#creating variable labels for easier interpretation
-var_label(endline) <- list(
-  wlthind = "Mother's Wealth Index",
-  womanage_group = "Mother's Age Group",
-  ethnicity = "Mother's Ethnicity",
-  mstatus = "Mother's Marital Status",
-  mumedu = "Mother's Education",
-  religion = "Mother's Religion",
-  sex = "Child's Sex",
-  alive = "Child's Alive Status"
-)
-
-endline <- endline %>%
-  mutate(across(c(district, wlthind, ethnicity, mstatus, mumedu, religion, sex, alive), as_factor))
-
-
+endline <- readRDS("endline.rds")
 
 #regressing the likelihood of birth day discordance on child's vital status 
 #converting day2_discordant to be numeric (1 or 2) then subtracting one to make it 1 or 0
@@ -89,6 +39,10 @@ model2 <- glm(as.numeric(day2_discordant) - 1 ~ as_factor(immcard, levels = "def
                                    #exponentiate presents coefficients as odds ratios
 table4 <- tbl_regression(model2, exponentiate = TRUE) 
 print(table4)
+
+################################################################################
+#below plots need to be revised pending further information on health variables#
+################################################################################
 
 #plotting all3dpt against day2_discordant
 endline %>%

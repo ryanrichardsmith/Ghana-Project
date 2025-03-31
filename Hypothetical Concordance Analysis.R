@@ -116,3 +116,4 @@ var_label(probabilities) <- list(
   difference_expected_observed = "Difference Between Expected/Observed Concordance",
   binomial_prob = "Prob. of Observing Concordant births among Reallocated Births")
 
+print(probabilities, n = 100)

@@ -15,27 +15,6 @@ months <- 0:11
 years <- c(-2, -1, 1, 2)
 
 endline_discordant <- months %>%
-  purrr::reduce(~ mutate(.x, 
-                         !!paste0("dob_", .y, "mo_over_1yr_over") := if_else(
-                           p2b_mo > (12 - .y) | todayyr == p2b_yr, NA,
-                           make_date(year = p2b_yr + 1, month = p2b_mo + .y, day = day)),
-                         !!paste0("dob_", .y, "mo_over_1yr_under") := if_else(
-                           p2b_mo > (12 - .y), NA,
-                           make_date(year = p2b_yr - 1, month = p2b_mo + .y, day = day))),
-                .init = endline_discordant)
-
-endline_discordant <- rev(months) %>%
-  purrr::reduce(~ mutate(.x, 
-                         !!paste0("dob_", .y, "mo_under_1yr_over") := if_else(
-                           p2b_mo < .y | todayyr == p2b_yr, NA,
-                           make_date(year = p2b_yr + 1, month = p2b_mo - .y, day = day)),
-                         !!paste0("dob_", .y, "mo_under_1yr_under") := if_else(
-                           p2b_mo < .y, NA,
-                           make_date(year = p2b_yr - 1, month = p2b_mo - .y, day = day))),
-                .init = endline_discordant)
-
-#*******************************************************************************
-endline_discordant <- months %>%
   purrr::reduce(~ purrr::reduce(years, function(.x, yr) {
     mutate(.x, 
            !!paste0("dob_", .y, "mo_over_", ifelse(yr < 0, paste0(abs(yr), "yr_under"), paste0(abs(yr), "yr_over"))) := if_else(
@@ -68,14 +47,17 @@ endline_discordant <- endline_discordant %>%
                            ))))
 
 #determining hypothetical concordances
-endline_discordant %>%
-  pivot_longer(cols = matches("^day1_|^dob_|day2_discordant$"), names_to = "columns", 
-               values_to = "values") %>%
-  mutate(years_displaced = ifelse(grepl("mo_under", columns), 
-                                  as.numeric(substring(columns, 2, 2), "Savory")))
+endline_discordant <- endline_discordant %>%
+  mutate(across(starts_with("day1_"), 
+                ~ case_when(
+                  . == day2 ~ "Concordant Day 2",
+                  . != day2 ~ "Discordant Day 2"                ), 
+                .names = "day2_discordant_{str_remove(.col, 'day1_')}")
+  )
 
+#transforming data to be long-form
 endline_discordant_long <- endline_discordant %>%
-  select(matches("^dob_|day2_discordant$")) %>%
+  select(matches("^dob_")) %>%
   mutate(across(everything(), as.character)) %>%
   pivot_longer(cols = everything(), 
                names_to = "columns", 
@@ -88,7 +70,49 @@ endline_discordant_long <- endline_discordant %>%
     years_displaced = case_when(
       grepl("yr_under", columns) ~ -as.numeric(str_extract(columns, "\\d+(?=yr_under)")),  
       grepl("yr_over", columns) ~ as.numeric(str_extract(columns, "\\d+(?=yr_over)"))    
-    )
+    ),
+    # Create a new column for the value of the corresponding day2_discordant column
+    day2_discordant_value = sapply(1:nrow(.), function(i) {
+      # Get the suffix from the 'columns' column to match the corresponding day2_discordant column
+      suffix <- sub("^day1_", "", .[i, "columns"])
+      day2_col <- paste0("day2_discordant_", suffix)  # Construct the corresponding day2_discordant column name
+      
+      # Extract the value from the corresponding day2_discordant column for the distinct date in 'values'
+      day2_value <- endline_discordant[[day2_col]][i]  # Use i to index the correct row value
+      
+      return(day2_value)
+    })
   )
 
-#hypothetical day2 concordances heatmap
+#filtering out impossible scenarios
+endline_discordant_long <- endline_discordant_long %>%
+  filter(!is.na(values))
+
+#counting how many births were in fact reallocated in each scenario and
+#counting how many reallocated births were in fact concordant with the day name
+probabilities <- endline_discordant_long %>%
+  group_by(columns) %>%
+  summarise(
+    Vs = n_distinct(values),
+    Cs = sum(day2_discordant_value == "Concordant Day 2", na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(Cs = ifelse(is.na(Cs), 0, Cs))
+
+#calculating the binomial probability of observing Cs concordant births given 
+#Vs reallocated births
+p <- 1/7
+
+probabilities <- probabilities %>%
+  mutate(Es = Vs * p) %>%
+  mutate(difference_expected_observed = Cs - Es) %>%
+  mutate(binomial_prob = dbinom(Cs, Vs, p))
+
+#labelling variables for readibility
+var_label(probabilities) <- list(
+  Vs = "Number of Reallocated Births",
+  Cs = "Number of Concordant Reallocated Births",
+  Es = "Expected No. of Concordant Births",
+  difference_expected_observed = "Difference Between Expected/Observed Concordance",
+  binomial_prob = "Prob. of Observing Concordant births among Reallocated Births")
+

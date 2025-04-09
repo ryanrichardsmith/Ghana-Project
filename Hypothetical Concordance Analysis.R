@@ -11,8 +11,8 @@ endline_discordant <- endline %>%
   filter(day2_discordant == "Discordant Day 2")
 
 #generating DOBs based on hypothetical overestimations of months and +1 year  
-months <- 0:11
-years <- c(-2, -1, 1, 2)
+months <- 0:11 
+years <- c(-2, -1, 0, 1, 2)
 
 endline_discordant <- months %>%
   purrr::reduce(~ purrr::reduce(years, function(.x, yr) {
@@ -22,7 +22,7 @@ endline_discordant <- months %>%
              make_date(year = p2b_yr + yr, month = p2b_mo + .y, day = day)),
            !!paste0("dob_", .y, "mo_under_", ifelse(yr < 0, paste0(abs(yr), "yr_under"), paste0(abs(yr), "yr_over"))) := if_else(
              p2b_mo > (12 - .y), NA,
-             make_date(year = p2b_yr + yr, month = p2b_mo + .y, day = day))
+             make_date(year = p2b_yr + yr, month = p2b_mo - .y, day = day))
     )
   }, .init = .), .init = endline_discordant)
 
@@ -55,45 +55,26 @@ endline_discordant <- endline_discordant %>%
                 .names = "day2_discordant_{str_remove(.col, 'day1_')}")
   )
 
-#transforming data to be long-form
-endline_discordant_long <- endline_discordant %>%
-  select(matches("^dob_")) %>%
-  mutate(across(everything(), as.character)) %>%
-  pivot_longer(cols = everything(), 
-               names_to = "columns", 
-               values_to = "values") %>%
-  mutate(
-    months_displaced = case_when(
-      grepl("mo_under", columns) ~ -as.numeric(str_extract(columns, "\\d+(?=mo_under)")),  
-      grepl("mo_over", columns) ~ as.numeric(str_extract(columns, "\\d+(?=mo_over)"))
-    ),
-    years_displaced = case_when(
-      grepl("yr_under", columns) ~ -as.numeric(str_extract(columns, "\\d+(?=yr_under)")),  
-      grepl("yr_over", columns) ~ as.numeric(str_extract(columns, "\\d+(?=yr_over)"))    
-    ),
-    # Create a new column for the value of the corresponding day2_discordant column
-    day2_discordant_value = sapply(1:nrow(.), function(i) {
-      # Get the suffix from the 'columns' column to match the corresponding day2_discordant column
-      suffix <- sub("^day1_", "", .[i, "columns"])
-      day2_col <- paste0("day2_discordant_", suffix)  # Construct the corresponding day2_discordant column name
-      
-      # Extract the value from the corresponding day2_discordant column for the distinct date in 'values'
-      day2_value <- endline_discordant[[day2_col]][i]  # Use i to index the correct row value
-      
-      return(day2_value)
-    })
-  )
 
-#filtering out impossible scenarios
-endline_discordant_long <- endline_discordant_long %>%
-  filter(!is.na(values))
+#transforming data to be long-form
+dob_long <- endline_discordant %>%
+  select(num_childid, starts_with("dob_")) %>%
+  pivot_longer(-num_childid, names_to = "column", values_to = "dob_value")
+
+discordant_long <- endline_discordant %>%
+  select(num_childid, starts_with("day2_discordant_")) %>%
+  pivot_longer(-num_childid, names_to = "column", values_to = "day2_discordant_value") %>%
+  mutate(column = str_remove(column, "^day2_discordant_"))
+
+endline_discordant_long <- dob_long %>%
+  left_join(discordant_long, by = c("num_childid", "column"))
 
 #counting how many births were in fact reallocated in each scenario and
 #counting how many reallocated births were in fact concordant with the day name
 probabilities <- endline_discordant_long %>%
-  group_by(columns) %>%
+  group_by(column) %>%
   summarise(
-    Vs = n_distinct(values),
+    Vs = n_distinct(dob_value),
     Cs = sum(day2_discordant_value == "Concordant Day 2", na.rm = TRUE),
     .groups = "drop"
   ) %>%

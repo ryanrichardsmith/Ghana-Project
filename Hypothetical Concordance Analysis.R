@@ -27,6 +27,26 @@ endline_discordant <- months %>%
   }, .init = .), .init = endline_discordant)
 
 
+dob_cols <- names(endline_discordant)[str_starts(names(endline_discordant), "dob_")]
+
+# filtering out scenarios where the reallocated DOB falls after the date of the survey
+endline_discordant <- endline_discordant %>%
+  mutate(todaymo_num = as.numeric(todaymo))  
+
+for (col in dob_cols) {
+  endline_discordant[[col]] <- if_else(
+    !is.na(endline_discordant[[col]]) &
+      (
+        year(endline_discordant[[col]]) > endline_discordant$todayyr |
+          (year(endline_discordant[[col]]) == endline_discordant$todayyr &
+             month(endline_discordant[[col]]) > endline_discordant$todaymo_num)
+      ),
+    as.Date(NA),
+    endline_discordant[[col]]
+  )
+}
+
+#subtracting one to ensure days of the week are consistent with day1
 endline_discordant <- endline_discordant %>%
   mutate(across(starts_with("dob_"), 
                 ~ wday(.x) - 1, 
@@ -69,6 +89,24 @@ discordant_long <- endline_discordant %>%
 endline_discordant_long <- dob_long %>%
   left_join(discordant_long, by = c("num_childid", "column"))
 
+#preventing duplicated reallocated DOBs by filtering out repeated entries with 
+#0 months reallocated in the same reallocated year
+endline_discordant_long <- endline_discordant_long %>%
+  mutate(
+    months_disp = as.integer(str_extract(column, "\\d+(?=mo)")),
+    years_disp = case_when(
+      str_detect(column, "yr_over") ~ as.integer(str_extract(column, "\\d+(?=yr)")),
+      str_detect(column, "yr_under") ~ -1 * as.integer(str_extract(column, "\\d+(?=yr)")),
+      TRUE ~ 0
+    ),
+    total_months_disp = months_disp + (12 * years_disp)
+  )
+
+endline_discordant_long <- endline_discordant_long %>%
+  group_by(num_childid, total_months_disp) %>%
+  slice(1) %>%
+  ungroup()
+
 #counting how many births were in fact reallocated in each scenario and
 #counting how many reallocated births were in fact concordant with the day name
 probabilities <- endline_discordant_long %>%
@@ -86,6 +124,7 @@ p <- 1/7
 
 probabilities <- probabilities %>%
   mutate(Es = Vs * p) %>%
+  mutate(Rs = ((Cs - Es)/Es)*100) %>%
   mutate(difference_expected_observed = Cs - Es) %>%
   mutate(binomial_prob = dbinom(Cs, Vs, p))
 
@@ -94,6 +133,7 @@ var_label(probabilities) <- list(
   Vs = "Number of Reallocated Births",
   Cs = "Number of Concordant Reallocated Births",
   Es = "Expected No. of Concordant Births",
+  Rs = "Relative Increase Over Expected",
   difference_expected_observed = "Difference Between Expected/Observed Concordance",
   binomial_prob = "Prob. of Observing Concordant births among Reallocated Births")
 

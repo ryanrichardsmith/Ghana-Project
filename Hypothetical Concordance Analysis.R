@@ -116,7 +116,7 @@ probabilities <- endline_discordant_long %>%
     Cs = sum(day2_discordant_value == "Concordant Day 2", na.rm = TRUE),
     .groups = "drop"
   ) %>%
-  mutate(Cs = ifelse(is.na(Cs), 0, Cs))
+  mutate(Cs = ifelse(is.na(Cs), 0, Cs)) 
 
 #calculating the binomial probability of observing Cs concordant births given 
 #Vs reallocated births
@@ -128,6 +128,19 @@ probabilities <- probabilities %>%
   mutate(difference_expected_observed = Cs - Es) %>%
   mutate(binomial_prob = dbinom(Cs, Vs, p))
 
+#extracting number of months/years displaced
+probabilities <- probabilities %>%
+  mutate(
+    months_disp = as.integer(str_extract(column, "\\d+(?=mo)")),
+    years_disp = case_when(
+      str_detect(column, "yr_over") ~ as.integer(str_extract(column, "\\d+(?=yr)")),
+      str_detect(column, "yr_under") ~ -1 * as.integer(str_extract(column, "\\d+(?=yr)")),
+      TRUE ~ 0
+    ),
+    total_months_disp = months_disp + (12 * years_disp)
+  )
+
+
 #labelling variables for readibility
 var_label(probabilities) <- list(
   Vs = "Number of Reallocated Births",
@@ -138,3 +151,24 @@ var_label(probabilities) <- list(
   binomial_prob = "Prob. of Observing Concordant births among Reallocated Births")
 
 print(probabilities, n = 100)
+
+#plotting heat map
+probabilities %>%
+  ggplot(aes(x = years_disp, y = months_disp, fill = Rs)) +
+  geom_tile() + 
+  geom_tile(
+    data = subset(probabilities, binomial_prob < 0.001),
+    aes(x = years_disp, y = months_disp),
+    fill = NA,
+    color = "black",
+    linewidth = 1
+  ) +
+  labs(
+    x = "Number of Years Displaced",
+    y = "Number of Months Displaced",
+    fill = "Relative Increase in Number 
+            of Concordant Births 
+            Over Expected No. of
+            Concordant Births",
+    subtitle = "Black Outline: p < 0.001") 
+

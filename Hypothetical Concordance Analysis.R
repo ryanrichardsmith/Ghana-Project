@@ -93,7 +93,11 @@ endline_discordant_long <- dob_long %>%
 #0 months reallocated in the same reallocated year
 endline_discordant_long <- endline_discordant_long %>%
   mutate(
-    months_disp = as.integer(str_extract(column, "\\d+(?=mo)")),
+    months_disp = case_when(
+      str_detect(column, "mo_over") ~ as.integer(str_extract(column, "\\d+(?=mo)")),
+      str_detect(column, "mo_under") ~ -1 * as.integer(str_extract(column, "\\d+(?=mo)")),
+      TRUE ~ 0
+    ),
     years_disp = case_when(
       str_detect(column, "yr_over") ~ as.integer(str_extract(column, "\\d+(?=yr)")),
       str_detect(column, "yr_under") ~ -1 * as.integer(str_extract(column, "\\d+(?=yr)")),
@@ -103,9 +107,7 @@ endline_discordant_long <- endline_discordant_long %>%
   )
 
 endline_discordant_long <- endline_discordant_long %>%
-  group_by(num_childid, total_months_disp) %>%
-  slice(1) %>%
-  ungroup()
+  distinct(num_childid, dob_value, total_months_disp, .keep_all = TRUE)
 
 #counting how many births were in fact reallocated in each scenario and
 #counting how many reallocated births were in fact concordant with the day name
@@ -131,7 +133,11 @@ probabilities <- probabilities %>%
 #extracting number of months/years displaced
 probabilities <- probabilities %>%
   mutate(
-    months_disp = as.integer(str_extract(column, "\\d+(?=mo)")),
+    months_disp = case_when(
+      str_detect(column, "mo_over") ~ as.integer(str_extract(column, "\\d+(?=mo)")),
+      str_detect(column, "mo_under") ~ -1 * as.integer(str_extract(column, "\\d+(?=mo)")),
+      TRUE ~ 0
+    ),
     years_disp = case_when(
       str_detect(column, "yr_over") ~ as.integer(str_extract(column, "\\d+(?=yr)")),
       str_detect(column, "yr_under") ~ -1 * as.integer(str_extract(column, "\\d+(?=yr)")),
@@ -152,23 +158,33 @@ var_label(probabilities) <- list(
 
 print(probabilities, n = 100)
 
+#setting values at the origin equal to 0 to leave the color scale unaffected
+probabilities <- probabilities %>%
+  mutate(Rs = if_else(years_disp == 0 & total_months_disp == 0, NA_real_, Rs))
+
 #plotting heat map
 probabilities %>%
-  ggplot(aes(x = years_disp, y = months_disp, fill = Rs)) +
+  ggplot(aes(x = months_disp, y =  years_disp, fill = Rs)) +
   geom_tile() + 
   geom_tile(
-    data = subset(probabilities, binomial_prob < 0.001),
-    aes(x = years_disp, y = months_disp),
+    data = subset(probabilities, binomial_prob < (0.05/114)),
+    aes(x = months_disp, y = years_disp),
     fill = NA,
     color = "black",
     linewidth = 1
   ) +
   labs(
-    x = "Number of Years Displaced",
-    y = "Number of Months Displaced",
+    y = "Number of Years Displaced",
+    x = "Number of Months Displaced",
     fill = "Relative Increase in Number 
             of Concordant Births 
             Over Expected No. of
             Concordant Births",
-    subtitle = "Black Outline: p < 0.001") 
+    subtitle = "Black Outline: p < 0.05/114") +
+  scale_x_continuous(expand = expansion(), sec.axis = dup_axis()) +
+  scale_y_continuous(expand = expansion(), sec.axis = dup_axis()) +
+  coord_fixed() +
+  geom_hline(yintercept = 0, color = "gray40", linetype = "dashed") +
+  geom_vline(xintercept = 0, color = "gray40", linetype = "dashed") +
+  theme_minimal()
 

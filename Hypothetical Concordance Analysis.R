@@ -14,18 +14,29 @@ endline_discordant <- endline %>%
 months <- 0:11 
 years <- c(-2, -1, 0, 1, 2)
 
-endline_discordant <- months %>%
-  purrr::reduce(~ purrr::reduce(years, function(.x, yr) {
-    mutate(.x, 
-           !!paste0("dob_", .y, "mo_over_", ifelse(yr < 0, paste0(abs(yr), "yr_under"), paste0(abs(yr), "yr_over"))) := if_else(
-             p2b_mo > (12 - .y) | todayyr == p2b_yr, NA,
-             make_date(year = p2b_yr + yr, month = p2b_mo + .y, day = day)),
-           !!paste0("dob_", .y, "mo_under_", ifelse(yr < 0, paste0(abs(yr), "yr_under"), paste0(abs(yr), "yr_over"))) := if_else(
-             p2b_mo > (12 - .y), NA,
-             make_date(year = p2b_yr + yr, month = p2b_mo - .y, day = day))
-    )
-  }, .init = .), .init = endline_discordant)
-
+for (mo_shift in months) {
+  for (yr_shift in years) {
+    
+    col_over <- paste0("dob_", mo_shift, "mo_over_", 
+                       ifelse(yr_shift < 0, paste0(abs(yr_shift), "yr_under"), paste0(abs(yr_shift), "yr_over")))
+    
+    col_under <- paste0("dob_", mo_shift, "mo_under_", 
+                        ifelse(yr_shift < 0, paste0(abs(yr_shift), "yr_under"), paste0(abs(yr_shift), "yr_over")))
+    
+    base_date <- make_date(endline_discordant$p2b_yr + yr_shift,
+                           endline_discordant$p2b_mo,
+                           endline_discordant$day)
+    
+    dob_over <- add_with_rollback(base_date, months(mo_shift))
+    dob_over <- if_else(year(dob_over) != year(base_date), as.Date(NA), dob_over)
+    
+    dob_under <- add_with_rollback(base_date, months(-mo_shift))
+    dob_under <- if_else(year(dob_under) != year(base_date), as.Date(NA), dob_under)
+    
+    endline_discordant[[col_over]] <- dob_over
+    endline_discordant[[col_under]] <- dob_under
+  }
+}
 
 dob_cols <- names(endline_discordant)[str_starts(names(endline_discordant), "dob_")]
 
@@ -187,4 +198,54 @@ probabilities %>%
   geom_hline(yintercept = 0, color = "gray40", linetype = "dashed") +
   geom_vline(xintercept = 0, color = "gray40", linetype = "dashed") +
   theme_minimal()
+
+#analyzing effects of modifying years alone
+yr_probabilities <- endline_discordant_long %>%
+  filter(years_disp != 0,months_disp == 0) %>% 
+  group_by(years_disp) %>%
+  summarise(
+    Vs = n_distinct(dob_value),
+    Cs = sum(day2_discordant_value == "Concordant Day 2", na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(Cs = ifelse(is.na(Cs), 0, Cs)) 
+
+yr_probabilities <- yr_probabilities %>%
+  mutate(Es = Vs * p) %>%
+  mutate(Rs = ((Cs - Es)/Es)*100) %>%
+  mutate(difference_expected_observed = Cs - Es) %>%
+  mutate(binomial_prob = dbinom(Cs, Vs, p))
+
+var_label(yr_probabilities) <- list(
+  Vs = "Number of Reallocated Births",
+  Cs = "Number of Concordant Reallocated Births",
+  Es = "Expected No. of Concordant Births",
+  Rs = "Relative Increase Over Expected",
+  difference_expected_observed = "Difference Between Expected/Observed Concordance",
+  binomial_prob = "Prob. of Observing Concordant births among Reallocated Births")
+
+#analyzing effects of modifying months alone
+mo_probabilities <- endline_discordant_long %>%
+  filter(years_disp == 0, months_disp != 0) %>%
+  group_by(months_disp) %>%
+  summarise(
+    Vs = n_distinct(dob_value),
+    Cs = sum(day2_discordant_value == "Concordant Day 2", na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(Cs = ifelse(is.na(Cs), 0, Cs)) 
+
+mo_probabilities <- mo_probabilities %>%
+  mutate(Es = Vs * p) %>%
+  mutate(Rs = ((Cs - Es)/Es)*100) %>%
+  mutate(difference_expected_observed = Cs - Es) %>%
+  mutate(binomial_prob = dbinom(Cs, Vs, p))
+
+var_label(mo_probabilities) <- list(
+  Vs = "Number of Reallocated Births",
+  Cs = "Number of Concordant Reallocated Births",
+  Es = "Expected No. of Concordant Births",
+  Rs = "Relative Increase Over Expected",
+  difference_expected_observed = "Difference Between Expected/Observed Concordance",
+  binomial_prob = "Prob. of Observing Concordant births among Reallocated Births")
 

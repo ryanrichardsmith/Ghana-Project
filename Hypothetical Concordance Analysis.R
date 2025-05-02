@@ -2,7 +2,7 @@ install.packages("pacman")
 library(pacman)
 
 p_load("haven","dplyr","labelled","tableone","ggplot2","Gmisc","gtsummary",
-       "lubridate", "tidyr", "purrr", "stringr", "glue")
+       "lubridate", "tidyr", "purrr", "stringr", "glue","rlang")
 
 endline <- readRDS("endline.rds")
 
@@ -175,77 +175,75 @@ probabilities <- probabilities %>%
 
 #plotting heat map
 probabilities %>%
-  ggplot(aes(x = months_disp, y =  years_disp, fill = Rs)) +
+  ggplot(aes(x = years_disp, y = months_disp, fill = Rs)) +
   geom_tile() + 
   geom_tile(
     data = subset(probabilities, binomial_prob < (0.05/114)),
-    aes(x = months_disp, y = years_disp),
+    aes(x = years_disp, y = months_disp),
     fill = NA,
     color = "black",
     linewidth = 1
   ) +
   labs(
-    y = "Number of Years Displaced",
-    x = "Number of Months Displaced",
-    fill = "Relative Increase in Number 
-            of Concordant Births 
-            Over Expected No. of
-            Concordant Births",
-    subtitle = "Black Outline: p < 0.05/114") +
+    x = "Number of Years Displaced",
+    y = "Number of Months Displaced"  ) +
+  scale_fill_gradient2(
+    low = "blue", mid = "white", high = "red", midpoint = 1,
+    name = "Black Outline: p < 0.05/114\n\n
+Relative Increase in Number\nof Concordant Births\nOver Expected Number"
+  ) +
   scale_x_continuous(expand = expansion(), sec.axis = dup_axis()) +
   scale_y_continuous(expand = expansion(), sec.axis = dup_axis()) +
   coord_fixed() +
-  geom_hline(yintercept = 0, color = "gray40", linetype = "dashed") +
   geom_vline(xintercept = 0, color = "gray40", linetype = "dashed") +
+  geom_hline(yintercept = 0, color = "gray40", linetype = "dashed") +
   theme_minimal()
 
-#analyzing effects of modifying years alone
-yr_probabilities <- endline_discordant_long %>%
-  filter(years_disp != 0,months_disp == 0) %>% 
-  group_by(years_disp) %>%
-  summarise(
-    Vs = n_distinct(dob_value),
-    Cs = sum(day2_discordant_value == "Concordant Day 2", na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(Cs = ifelse(is.na(Cs), 0, Cs)) 
+conditions <- c(
+  "Effect of Year Displacement" = "years_disp != 0 & months_disp == 0",
+  "Effect of Month Displacement" = "years_disp == 0 & months_disp != 0",
+  "Effect of Year Underestimation & Month Overestimation" = "years_disp < 0 & months_disp > 0",
+  "Effect of Year Overestimation & Month Overestimation" = "years_disp > 0 & months_disp > 0",
+  "Effect of Year Underestimation & Month Underestimation" = "years_disp < 0 & months_disp < 0",
+  "Effect of Year Overestimation & Month Underestimation" = "years_disp > 0 & months_disp < 0"
+)
 
-yr_probabilities <- yr_probabilities %>%
-  mutate(Es = Vs * p) %>%
-  mutate(Rs = ((Cs - Es)/Es)*100) %>%
-  mutate(difference_expected_observed = Cs - Es) %>%
-  mutate(binomial_prob = dbinom(Cs, Vs, p))
+results <- list()
 
-var_label(yr_probabilities) <- list(
+for (i in seq_along(conditions)) {
+  condition_expr <- parse_expr(conditions[i])
+  
+  calculations <- endline_discordant_long %>%
+    filter(!!condition_expr) %>%
+    summarise(
+      Vs = n_distinct(dob_value),
+      Cs = sum(day2_discordant_value == "Concordant Day 2", na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(Cs = ifelse(is.na(Cs), 0, Cs)) %>%
+    mutate(
+      Es = Vs * p,
+      Rs = ((Cs - Es) / Es) * 100,
+      difference_expected_observed = Cs - Es,
+      binomial_prob = dbinom(Cs, Vs, p),
+      Effect = names(conditions)[i]
+    )
+  
+  results[[i]] <- calculations
+}
+
+aggregated_probabilities <- bind_rows(results)
+
+#putting label as first column
+aggregated_probabilities <- aggregated_probabilities %>%
+  select(Effect, everything())
+
+#adding column labels for readability
+var_label(aggregated_probabilities) <- list(
   Vs = "Number of Reallocated Births",
   Cs = "Number of Concordant Reallocated Births",
   Es = "Expected No. of Concordant Births",
   Rs = "Relative Increase Over Expected",
   difference_expected_observed = "Difference Between Expected/Observed Concordance",
-  binomial_prob = "Prob. of Observing Concordant births among Reallocated Births")
-
-#analyzing effects of modifying months alone
-mo_probabilities <- endline_discordant_long %>%
-  filter(years_disp == 0, months_disp != 0) %>%
-  group_by(months_disp) %>%
-  summarise(
-    Vs = n_distinct(dob_value),
-    Cs = sum(day2_discordant_value == "Concordant Day 2", na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(Cs = ifelse(is.na(Cs), 0, Cs)) 
-
-mo_probabilities <- mo_probabilities %>%
-  mutate(Es = Vs * p) %>%
-  mutate(Rs = ((Cs - Es)/Es)*100) %>%
-  mutate(difference_expected_observed = Cs - Es) %>%
-  mutate(binomial_prob = dbinom(Cs, Vs, p))
-
-var_label(mo_probabilities) <- list(
-  Vs = "Number of Reallocated Births",
-  Cs = "Number of Concordant Reallocated Births",
-  Es = "Expected No. of Concordant Births",
-  Rs = "Relative Increase Over Expected",
-  difference_expected_observed = "Difference Between Expected/Observed Concordance",
-  binomial_prob = "Prob. of Observing Concordant births among Reallocated Births")
-
+  binomial_prob = "Prob. of Observing Concordant births among Reallocated Births"
+  )

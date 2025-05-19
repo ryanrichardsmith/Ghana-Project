@@ -2,12 +2,13 @@ install.packages("pacman")
 library(pacman)
 
 p_load("haven","dplyr","labelled","tableone","ggplot2","Gmisc","gtsummary",
-       "lubridate", "tidyr", "purrr", "stringr", "glue","rlang")
+       "lubridate", "tidyr", "purrr", "stringr", "glue","rlang","here")
 
-endline <- readRDS("endline.rds")
+endline <- readRDS(here("endline.rds"))
 
-#filtering to only include discordant observations
+#filtering to only include discordant observations & observations recorded as alive 
 endline_discordant <- endline %>%
+  filter(alive == "Yes") %>%
   filter(day2_discordant == "Discordant Day 2")
 
 #generating DOBs based on hypothetical overestimations of months and +1 year  
@@ -189,7 +190,7 @@ probabilities %>%
     y = "Number of Months Displaced"  ) +
   scale_fill_gradient2(
     low = "blue", mid = "white", high = "red", midpoint = 1,
-    name = "Black Outline: p < 0.05/114\n\n
+    name = "Alive Status: Alive\n\n\n\n\n\nBlack Outline: p < 0.05/114\n
 Relative Increase in Number\nof Concordant Births\nOver Expected Number"
   ) +
   scale_x_continuous(expand = expansion(), sec.axis = dup_axis()) +

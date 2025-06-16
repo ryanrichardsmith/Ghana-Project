@@ -1,10 +1,9 @@
 install.packages("pacman")
 library(pacman)
 
-p_load("haven","dplyr","labelled","tableone","ggplot2","Gmisc","gtsummary",
-       "lubridate", "tidyr", "purrr", "stringr", "glue","rlang","here")
+p_load("source","here")
 
-endline <- readRDS(here("endline.rds"))
+source(here("scripts","Data Prep.R"))
 
 #filtering to only include discordant observations & observations recorded as deceased 
 endline_discordant <- endline %>%
@@ -248,3 +247,5 @@ var_label(aggregated_probabilities) <- list(
   difference_expected_observed = "Difference Between Expected/Observed Concordance",
   binomial_prob = "Prob. of Observing Concordant births among Reallocated Births"
 )
+
+print(aggregated_probabilities)

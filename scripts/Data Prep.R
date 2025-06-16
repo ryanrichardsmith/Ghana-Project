@@ -1,10 +1,7 @@
-install.packages("pacman")
-library(pacman)
-
 p_load("haven","dplyr","labelled","tableone","ggplot2","Gmisc","gtsummary",
-       "lubridate", "tidyr")
+       "lubridate", "tidyr", "purrr", "stringr", "glue","rlang")
 
-endline <- read_dta("endline_cleaned.dta")
+endline <- read_dta(here("data","endline_cleaned.dta"))
 
 #creating numeric chilid
 endline$num_childid <- seq_len(nrow(endline))
@@ -50,6 +47,3 @@ var_label(endline) <- list(
 
 endline <- endline %>%
   mutate(across(c(district, wlthind, ethnicity, mstatus, mumedu, religion, sex, alive), as_factor))
-
-#saving prepared dataframe
-saveRDS(endline, file = "endline.rds")

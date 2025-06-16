@@ -1,10 +1,9 @@
 install.packages("pacman")
 library(pacman)
 
-p_load("haven","dplyr","labelled","tableone","ggplot2","Gmisc","gtsummary",
-       "lubridate", "tidyr")
+p_load("source","here")
 
-endline <- readRDS("endline.rds")
+source(here("scripts","Data Prep.R"))
 
 #regressing the likelihood of birth day discordance on child's vital status 
 #converting day2_discordant to be numeric (1 or 2) then subtracting one to make it 1 or 0

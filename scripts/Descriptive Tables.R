@@ -1,10 +1,9 @@
 install.packages("pacman")
 library(pacman)
 
-p_load("haven","dplyr","labelled","tableone","ggplot2","Gmisc","gtsummary",
-       "lubridate", "tidyr")
+p_load("source","here")
 
-endline <- readRDS("endline.rds")
+source(here("scripts","Data Prep.R"))
 
 table <- CreateTableOne(vars = c("wlthind","womanage_group","ethnicity",
                                  "mstatus","mumedu","religion","sex","alive"),
